@@ -1,8 +1,58 @@
+import uuid
 import pandas as pd
 import os
 import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import datetime
+
+class Department:
+    def __init__(self, name, employees=None):
+        if employees is None:
+            self.employees = dict()
+        else:
+            self.employees = employees
+        self.name       = name
+
+    def add_employee(self, employee):
+        self.employees[employee.uuid] = employee
+
+    def remove_employee(self, employee):
+        self.employees.pop(employee.uuid)
+
+class Employee:
+    def __init__(self, name):
+        self.uuid = uuid.uuid4()
+        self.name = name
+
+def load_department_from_file(filename):
+    department      = None
+    department_list = []
+    with open(filename) as f:
+        for line in f:
+            line_str = line.strip()
+            if line_str != '':
+                line_str = line_str.rstrip()
+                if '•' in line_str:
+                    employee_name   = line_str.split('•')[1].replace('\t','')
+                    employee        = Employee(employee_name)
+                    try:
+                        department.add_employee(employee)
+                    except Exception as e:
+                        print(e)
+                else:
+                    if department is not None:
+                        department_list.append(department)
+                    department = Department(line_str)
+
+    return department_list
+
+
+departments = load_department_from_file('README.txt')
+dept_employee_map = dict()
+for department in departments:
+    dept_employee_map[department.name] = [emp.name for emp in department.employees.values()]
+
+
 
 # ==== STEP 1: Load Inventory ====
 inventory_path = "equipment-Inventory.xlsx"
@@ -39,6 +89,10 @@ vendor_var = tk.StringVar()
 location_var = tk.StringVar()
 status_var = tk.StringVar()
 last_cleaned_var = tk.StringVar()
+
+department_selection_var = tk.StringVar()
+employee_selection_var = tk.StringVar()
+
 
 name_var = tk.StringVar()
 dept_var = tk.StringVar()
@@ -103,6 +157,7 @@ def log_action(action):
     dept_var.set("")
     device_name_var.set(list(device_dict.keys())[0])
     update_device_info()
+
 
 # ==== View Employee Borrowed Devices ====
 def show_borrowed_equipment():
@@ -170,5 +225,39 @@ tk.Button(root, text="View Borrowed Equipment", command=show_borrowed_equipment,
 # Setup auto-update for metadata
 device_name_var.trace_add("write", update_device_info)
 update_device_info()
+
+## DEPT-EMPLOYEE DROPDOWN
+
+def update_employee_dropdown(*args):
+    selected_dept   = department_selection_var.get()
+    employees       = dept_employee_map.get(selected_dept, [])
+    menu            = employee_dropdown['menu']
+    menu.delete(0, 'end')
+
+    if employees:
+        for emp in employees:
+            menu.add_command(label=emp, command=lambda val=emp: employee_selection_var.set(val))
+        employee_selection_var.set(employees[0])
+    else:
+        employee_selection_var.set("")
+
+# Department Dropdown
+tk.Label(root, text="Department:", font=FONT).grid(row=12, column=0, sticky="e", padx=10, pady=5)
+dept_options = list(dept_employee_map.keys())
+department_selection_var.set(dept_options[0] if dept_options else "")
+department_dropdown = ttk.OptionMenu(root, department_selection_var, department_selection_var.get(), *dept_options)
+department_dropdown.grid(row=12, column=1, padx=10, pady=5, sticky="w")
+
+# Employee Dropdown (updates when department changes)
+tk.Label(root, text="Employee:", font=FONT).grid(row=13, column=0, sticky="e", padx=10, pady=5)
+employee_dropdown = ttk.OptionMenu(root, employee_selection_var, "")
+employee_dropdown.grid(row=13, column=1, padx=10, pady=5, sticky="w")
+
+# Trigger update
+department_selection_var.trace_add("write", update_employee_dropdown)
+update_employee_dropdown()
+
+selected_employee = employee_selection_var.get()
+
 
 root.mainloop()
